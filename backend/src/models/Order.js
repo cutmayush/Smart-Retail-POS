@@ -13,7 +13,7 @@ const orderItemSchema = new mongoose.Schema(
 
 const orderSchema = new mongoose.Schema(
   {
-    orderNumber: { type: String, required: true, unique: true },
+    orderNumber: { type: String, required: true },
     customer: { type: String, default: 'Walk-in Customer' },
     items: { type: [orderItemSchema], required: true },
     itemsCount: { type: Number, required: true },
@@ -29,9 +29,12 @@ const orderSchema = new mongoose.Schema(
     },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     store: { type: String, default: 'Central Flagship' },
+    tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'Store', required: true, index: true },
   },
   { timestamps: true },
 );
+
+orderSchema.index({ tenant: 1, orderNumber: 1 }, { unique: true });
 
 const Order = mongoose.model('Order', orderSchema);
 

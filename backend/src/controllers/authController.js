@@ -1,43 +1,81 @@
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import asyncHandler from 'express-async-handler';
+import mongoose from 'mongoose';
 import User from '../models/User.js';
+import Store from '../models/Store.js';
 import sendPasswordResetEmail from '../utils/sendPasswordResetEmail.js';
+import { ensureTransactionSupport } from '../utils/ensureTransactionSupport.js';
 
 const generateToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
 
-// @desc    Register a new user (self-signup)
+// @desc    Register a store and its Admin owner
 // @route   POST /api/auth/register
 // @access  Public
 export const registerUser = asyncHandler(async (req, res) => {
-  const { name, email, password } = req.body;
+  const { name, email, password, passwordConfirm, storeName } = req.body;
+  const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+  const ownerName = typeof name === 'string' ? name.trim() : '';
+  const businessName = typeof storeName === 'string' ? storeName.trim() : '';
 
-  if (!name || !email || !password) {
+  if (!ownerName || !businessName || !normalizedEmail || !password || !passwordConfirm) {
     res.status(400);
-    throw new Error('Name, email and password are required');
+    throw new Error('Owner name, store name, email, password and password confirmation are required');
   }
-  if (password.length < 6) {
+  if (ownerName.length > 120 || businessName.length > 120) {
     res.status(400);
-    throw new Error('Password must be at least 6 characters');
+    throw new Error('Owner and store names must be 120 characters or fewer');
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    res.status(400);
+    throw new Error('Enter a valid email address');
+  }
+  if (typeof password !== 'string' || password.length < 8 || password.length > 128) {
+    res.status(400);
+    throw new Error('Password must be between 8 and 128 characters');
+  }
+  if (password !== passwordConfirm) {
+    res.status(400);
+    throw new Error('Passwords do not match');
   }
 
-  const existing = await User.findOne({ email: email.toLowerCase() });
+  const existing = await User.findOne({ email: normalizedEmail });
   if (existing) {
     res.status(400);
     throw new Error('An account with this email already exists');
   }
 
-  // Self-registration always creates a Cashier account. Any 'role' sent in the
-  // request body is intentionally ignored — Admin/Manager accounts must be
-  // created by an existing Admin via /api/users, never chosen by the signer-upper.
-  const user = await User.create({ name, email, password, role: 'Cashier' });
+  await ensureTransactionSupport();
+  const session = await mongoose.startSession();
+  try {
+    let store;
+    let user;
+    await session.withTransaction(async () => {
+      [store] = await Store.create([{ name: businessName }], { session });
+      [user] = await User.create(
+        [{
+          name: ownerName,
+          email: normalizedEmail,
+          password,
+          role: 'Admin',
+          tenant: store._id,
+          store: businessName,
+        }],
+        { session },
+      );
+      store.owner = user._id;
+      await store.save({ session });
+    });
 
-  res.status(201).json({
-    success: true,
-    user: user.toSafeObject(),
-    token: generateToken(user._id),
-  });
+    res.status(201).json({
+      success: true,
+      user: user.toSafeObject(),
+      token: generateToken(user._id),
+    });
+  } finally {
+    await session.endSession();
+  }
 });
 
 // @desc    Login
@@ -45,13 +83,14 @@ export const registerUser = asyncHandler(async (req, res) => {
 // @access  Public
 export const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
+  const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
 
-  if (!email || !password) {
+  if (!normalizedEmail || typeof password !== 'string' || !password) {
     res.status(400);
     throw new Error('Email and password are required');
   }
 
-  const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
+  const user = await User.findOne({ email: normalizedEmail }).select('+password');
 
   if (!user || !(await user.comparePassword(password))) {
     res.status(401);
@@ -77,12 +116,13 @@ export const getMe = asyncHandler(async (req, res) => {
 // @access  Public
 export const forgotPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
-  if (!email) {
+  const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+  if (!normalizedEmail) {
     res.status(400);
     throw new Error('Email is required');
   }
 
-  const user = await User.findOne({ email: email.toLowerCase() });
+  const user = await User.findOne({ email: normalizedEmail });
 
   // Always return the same generic response whether or not the account exists,
   // so this endpoint can't be used to discover which emails are registered.
@@ -124,7 +164,8 @@ export const forgotPassword = asyncHandler(async (req, res) => {
 export const resetPassword = asyncHandler(async (req, res) => {
   const { email, token, password } = req.body;
 
-  if (!email || !token || !password) {
+  const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+  if (!normalizedEmail || typeof token !== 'string' || !token || typeof password !== 'string' || !password) {
     res.status(400);
     throw new Error('Email, reset token and new password are required');
   }
@@ -136,7 +177,7 @@ export const resetPassword = asyncHandler(async (req, res) => {
   const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
 
   const user = await User.findOne({
-    email: email.toLowerCase(),
+    email: normalizedEmail,
     resetPasswordToken: hashedToken,
     resetPasswordExpires: { $gt: Date.now() },
   }).select('+resetPasswordToken +resetPasswordExpires');

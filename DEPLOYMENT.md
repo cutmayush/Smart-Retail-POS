@@ -73,10 +73,21 @@ spin down when idle, so the first request after inactivity may take longer.
 For a checkout system that needs consistently fast availability, choose an
 always-on paid API plan in Render.
 
-## 4. Create the first Admin
+## 4. Migrate existing data and register a store
 
-Self-registration creates Cashier accounts only. Create the first Admin once
-before managing products, inventory, or staff:
+For an existing database, take a backup, pause API writes, and run
+`npm run migrate-tenants` from the `backend` directory before deploying the
+tenant-aware API. It assigns all pre-existing users and business records to
+one shared Legacy Store tenant to preserve their current visibility, and
+replaces global SKU/barcode/order-number unique indexes with tenant-scoped
+indexes. The migration can safely be rerun.
+
+For a fresh or migrated database, open the app and select **Create New Store
+Account** to create a store and its Admin account atomically. Existing users
+continue signing in with their existing credentials.
+
+To provision an Admin/store from the command line instead, run
+`npm run create-admin` from the `backend` directory and follow the prompts.
 
 1. Make a backup copy of `backend/.env` if it already exists.
 2. Temporarily set `MONGO_URI` in `backend/.env` to the same production Atlas
@@ -88,13 +99,13 @@ before managing products, inventory, or staff:
    npm run create-admin
    ```
 
-4. Enter the Admin name, email, and a strong password. The command creates an
-   account; it does not clear or seed the database.
+4. Enter the Admin name, store name, email, and a strong password. The command creates a store and account; it
+   does not clear or seed any data.
 5. Restore your original local `backend/.env` (or remove the temporary
    production URI). Never commit or share it.
 
-If the database already has accounts, do not create another first Admin; sign
-in with an existing Admin account instead.
+This command creates a separate store. Existing users can continue signing in
+with their current credentials.
 
 ## 5. Verify the live app
 
@@ -113,8 +124,9 @@ Use the URLs shown in the Render dashboard:
 5. Check dashboards and Reports. Download both CSV and PDF exports.
 6. Request a password reset for a test account, retrieve the emailed code,
    submit it before its 15-minute expiry, and sign in with the new password.
-7. Register a separate test account and verify it receives the Cashier role.
-   Confirm that only Admins can access Team Management.
+7. Register two separate stores and verify each owner receives the Admin role.
+   Create staff accounts and verify product, order, inventory, and report data
+   are not visible across stores. Confirm only Admins can access Team Management.
 
 If any check fails, inspect the corresponding service's **Logs** in Render.
 Do not post logs containing tokens, email reset codes, database URIs, or API

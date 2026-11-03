@@ -2,14 +2,15 @@ import asyncHandler from 'express-async-handler';
 import User from '../models/User.js';
 
 export const getUsers = asyncHandler(async (req, res) => {
-  const users = await User.find().sort({ createdAt: -1 });
+  const users = await User.find({ tenant: req.tenantId }).sort({ createdAt: -1 });
   res.status(200).json({ success: true, count: users.length, users: users.map((u) => u.toSafeObject()) });
 });
 
 export const createUser = asyncHandler(async (req, res) => {
   const { name, email, password, role, store } = req.body;
+  const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
 
-  if (!name || !email || !password) {
+  if (!name || !normalizedEmail || !password) {
     res.status(400);
     throw new Error('Name, email and password are required');
   }
@@ -17,18 +18,25 @@ export const createUser = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error('Role must be Admin, Manager or Cashier');
   }
-  const existing = await User.findOne({ email: email.toLowerCase() });
+  const existing = await User.findOne({ email: normalizedEmail });
   if (existing) {
     res.status(400);
     throw new Error('An account with this email already exists');
   }
 
-  const user = await User.create({ name, email, password, role, store: store || 'Central Flagship' });
+  const user = await User.create({
+    name,
+    email: normalizedEmail,
+    password,
+    role,
+    store: store || req.user.store,
+    tenant: req.tenantId,
+  });
   res.status(201).json({ success: true, user: user.toSafeObject() });
 });
 
 export const updateUser = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.params.id);
+  const user = await User.findOne({ _id: req.params.id, tenant: req.tenantId });
   if (!user) {
     res.status(404);
     throw new Error('User not found');
@@ -53,7 +61,7 @@ export const updateUser = asyncHandler(async (req, res) => {
 });
 
 export const deleteUser = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.params.id);
+  const user = await User.findOne({ _id: req.params.id, tenant: req.tenantId });
   if (!user) {
     res.status(404);
     throw new Error('User not found');

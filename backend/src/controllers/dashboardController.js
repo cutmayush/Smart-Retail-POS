@@ -23,10 +23,10 @@ export const getStatCards = asyncHandler(async (req, res) => {
   yesterdayStart.setDate(yesterdayStart.getDate() - 1);
 
   const [todayOrders, yesterdayOrders, allOrders, lowStockCount] = await Promise.all([
-    Order.find({ status: 'Completed', createdAt: { $gte: todayStart } }),
-    Order.find({ status: 'Completed', createdAt: { $gte: yesterdayStart, $lt: todayStart } }),
-    Order.find(),
-    Product.countDocuments({ $expr: { $lte: ['$stock', '$threshold'] } }),
+    Order.find({ tenant: req.tenantId, status: 'Completed', createdAt: { $gte: todayStart } }),
+    Order.find({ tenant: req.tenantId, status: 'Completed', createdAt: { $gte: yesterdayStart, $lt: todayStart } }),
+    Order.find({ tenant: req.tenantId }),
+    Product.countDocuments({ tenant: req.tenantId, $expr: { $lte: ['$stock', '$threshold'] } }),
   ]);
 
   const todaySales = sumTotals(todayOrders);
@@ -62,6 +62,7 @@ export const getRevenueTrend = asyncHandler(async (req, res) => {
     const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const nextMonthDate = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
     const orders = await Order.find({
+      tenant: req.tenantId,
       status: 'Completed',
       createdAt: { $gte: monthDate, $lt: nextMonthDate },
     });
@@ -82,7 +83,7 @@ export const getRevenueTrend = asyncHandler(async (req, res) => {
 // Frontend has no real channel field on orders yet, so this groups by payment method
 // as a stand-in "channel" split that still reflects real data.
 export const getSalesChannelSplit = asyncHandler(async (req, res) => {
-  const orders = await Order.find({ status: 'Completed' });
+  const orders = await Order.find({ tenant: req.tenantId, status: 'Completed' });
   const total = orders.length || 1;
   const byPayment = orders.reduce((acc, o) => {
     acc[o.payment] = (acc[o.payment] || 0) + 1;
@@ -106,10 +107,10 @@ export const getReportHighlights = asyncHandler(async (req, res) => {
   const monthStart = startOfMonth(now);
 
   const [dailyOrders, weeklyOrders, monthlyOrders, products] = await Promise.all([
-    Order.find({ status: 'Completed', createdAt: { $gte: todayStart } }),
-    Order.find({ status: 'Completed', createdAt: { $gte: weekStart } }),
-    Order.find({ status: 'Completed', createdAt: { $gte: monthStart } }),
-    Product.find(),
+    Order.find({ tenant: req.tenantId, status: 'Completed', createdAt: { $gte: todayStart } }),
+    Order.find({ tenant: req.tenantId, status: 'Completed', createdAt: { $gte: weekStart } }),
+    Order.find({ tenant: req.tenantId, status: 'Completed', createdAt: { $gte: monthStart } }),
+    Product.find({ tenant: req.tenantId }),
   ]);
 
   const inventoryValue = products.reduce((sum, p) => sum + p.price * p.stock, 0);

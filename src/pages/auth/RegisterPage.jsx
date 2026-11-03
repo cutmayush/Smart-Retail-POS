@@ -9,7 +9,7 @@ import { useAuthStore } from '@/store/authStore';
 function RegisterPage() {
   const navigate = useNavigate();
   const registerUser = useAuthStore((state) => state.register);
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm();
+  const { register, handleSubmit, getValues, formState: { errors, isSubmitting } } = useForm();
 
   const onSubmit = async (values) => {
     try {
@@ -34,19 +34,27 @@ function RegisterPage() {
           <span className="text-sm font-semibold text-slate-600">Smart Retail POS</span>
         </div>
 
-        <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">Create a cashier account</h2>
+        <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">Register your store</h2>
         <p className="mt-2 text-sm text-slate-500">
-          Self-signup creates a Cashier account. An Admin can upgrade your role afterwards, or create Manager/Admin accounts directly from User Management.
+          Create a store workspace and become its Admin. You can add Managers and Cashiers from Team Management.
         </p>
 
         <form onSubmit={handleSubmit(onSubmit)} className="mt-6 grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2 sm:grid sm:grid-cols-2 sm:gap-4 space-y-4 sm:space-y-0">
             <Input
-              label="Full name"
+              label="Owner/Admin name"
               placeholder="Aarav Sharma"
               {...register('name', { required: 'Name is required' })}
               error={errors.name?.message}
             />
+            <Input
+              label="Store/business name"
+              placeholder="Aarav's Market"
+              {...register('storeName', { required: 'Store name is required' })}
+              error={errors.storeName?.message}
+            />
+          </div>
+          <div className="sm:col-span-2">
             <Input
               label="Email"
               type="email"
@@ -56,19 +64,34 @@ function RegisterPage() {
             />
           </div>
 
-          <div className="sm:col-span-2">
+          <div>
             <Input
               label="Password"
               type="password"
-              placeholder="Minimum 6 characters"
-              {...register('password', { required: 'Password is required', minLength: { value: 6, message: 'Min 6 characters' } })}
+              autoComplete="new-password"
+              placeholder="At least 8 characters"
+              {...register('password', { required: 'Password is required', minLength: { value: 8, message: 'Min 8 characters' } })}
               error={errors.password?.message}
+            />
+          </div>
+
+          <div>
+            <Input
+              label="Confirm password"
+              type="password"
+              autoComplete="new-password"
+              placeholder="Re-enter your password"
+              {...register('passwordConfirm', {
+                required: 'Please confirm your password',
+                validate: (value) => value === getValues('password') || 'Passwords do not match',
+              })}
+              error={errors.passwordConfirm?.message}
             />
           </div>
 
           <div className="sm:col-span-2">
             <Button type="submit" className="w-full py-3" disabled={isSubmitting}>
-              {isSubmitting ? 'Creating account…' : 'Create account'}
+              {isSubmitting ? 'Creating store…' : 'Create store account'}
             </Button>
           </div>
         </form>

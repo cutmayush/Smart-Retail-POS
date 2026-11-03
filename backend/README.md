@@ -35,34 +35,49 @@ For example, the URI should look like this (with your real values substituted):
 mongodb+srv://<database-user>:<encoded-password>@<your-cluster>.mongodb.net/smart_retail_pos?retryWrites=true&w=majority&appName=smart-retail-pos
 ```
 
-Atlas supports the transactions used by checkout and order cancellation. The app
-creates its database collections automatically when records are first saved.
+Atlas supports the transactions used by registration, admin provisioning,
+checkout, and order cancellation. The app creates its database collections
+automatically when records are first saved.
 
-## Run the backend and create the first Admin
+## Migrate existing data and register a store
 
 ```bash
 npm install
-npm run create-admin
+npm run migrate-tenants
 npm run dev
 ```
 
-Run these commands from this `backend` folder after configuring `.env`.
-For a fresh database, `npm run create-admin` asks for the first Admin name,
-email, and password and stores the password securely. Do not run it if this
-database already has accounts; sign in with an existing account instead. The
-command does not erase or seed any data. Then start the frontend from the
-project root with `npm install` and `npm run dev`. Registering through the app
-creates a Cashier account; an Admin can create Manager and additional Admin
-accounts from User Management.
+Run these commands from this `backend` folder after configuring `.env`. Before
+deploying this tenant-aware version to a database with existing data, back up
+the database, pause API writes, and run `npm run migrate-tenants`. The
+idempotent migration assigns all pre-existing users, products, orders, and
+inventory logs to one shared **Legacy Store** tenant, preserving their current
+visibility. It also replaces global product SKU/barcode and order-number
+uniqueness with tenant-scoped unique indexes. Do not start the new API against
+an unmigrated database.
+
+After migration, start the API and frontend from the project root and use
+**Create New Store Account** on the login page to register a store owner. The
+registration creates a separate store and an Admin account atomically. Admins
+can create Managers and Cashiers from Team Management. `npm run create-admin`
+is also available for an operator-created Admin/store and requires MongoDB
+transactions.
 
 The API runs at `http://localhost:5000`.
+
+### Tenant integration test
+
+The backend integration test uses a dedicated MongoDB replica-set database
+because it registers stores and performs transactional checkout. Set
+`TEST_MONGO_URI` to that test database and run `npm test` from this folder.
+The test cleans up records it creates but does not drop the database.
 
 ## API Reference
 
 ### Auth — `/api/auth`
 | Method | Route | Access | Notes |
 |---|---|---|---|
-| POST | `/register` | Public | `{ name, email, password, role, store }` |
+| POST | `/register` | Public | `{ name, storeName, email, password, passwordConfirm }` — creates a tenant Admin |
 | POST | `/login` | Public | `{ email, password }` → `{ user, token }` |
 | GET | `/me` | Private | Returns current user from token |
 | POST | `/forgot-password` | Public | `{ email }` — sends a 15-minute reset code by email in production |
@@ -106,6 +121,10 @@ The API runs at `http://localhost:5000`.
 
 ## Notes
 - All protected routes expect `Authorization: Bearer <token>`.
+- Each protected request resolves the user's tenant from the database; tenant
+  IDs are never accepted from request bodies as authorization.
+- Existing records must be assigned to a tenant with `npm run migrate-tenants`
+  before the new API is deployed.
 - Checkout and cancellation use MongoDB transactions to keep order, stock, and inventory-log changes atomic.
 - Product edits cannot change stock directly; use the inventory adjustment endpoint so all stock movements are logged.
 - Password reset sends a one-time code using Resend. Configure `RESEND_API_KEY`

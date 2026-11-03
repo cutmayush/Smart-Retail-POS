@@ -8,6 +8,7 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true, minlength: 6, select: false },
     role: { type: String, enum: ['Admin', 'Manager', 'Cashier'], default: 'Cashier' },
+    tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'Store', required: true, index: true },
     store: { type: String, default: 'Central Flagship' },
     resetPasswordToken: { type: String, select: false },
     resetPasswordExpires: { type: Date, select: false },
@@ -43,6 +44,7 @@ userSchema.methods.toSafeObject = function toSafeObject() {
     email: this.email,
     role: this.role,
     store: this.store,
+    storeId: this.tenant?.toString(),
   };
 };
 

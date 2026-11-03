@@ -10,7 +10,9 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "create-admin": "node src/utils/createAdmin.js"
+    "create-admin": "node src/utils/createAdmin.js",
+    "migrate-tenants": "node src/utils/migrateTenants.js",
+    "test": "node --test"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

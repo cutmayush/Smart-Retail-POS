@@ -4,36 +4,15 @@ import crypto from 'crypto';
 import Order from '../models/Order.js';
 import Product from '../models/Product.js';
 import InventoryLog from '../models/InventoryLog.js';
+import { ensureTransactionSupport } from '../utils/ensureTransactionSupport.js';
 
 const generateOrderNumber = () => `ORD-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
-let transactionSupport;
-
-const supportsTransactions = async () => {
-  if (!transactionSupport) {
-    transactionSupport = mongoose.connection.db.admin().command({ hello: 1 })
-      .then((hello) => Boolean(hello.setName || hello.msg === 'isdbgrid'))
-      .catch((error) => {
-        transactionSupport = null;
-        throw error;
-      });
-  }
-  return transactionSupport;
-};
-
-const requireTransactionSupport = async (res) => {
-  if (!(await supportsTransactions())) {
-    res.status(503);
-    throw new Error(
-      'MongoDB transactions are unavailable. Configure MongoDB as replica set "rs0" (see backend/README.md) or use MongoDB Atlas.',
-    );
-  }
-};
 
 // @route  GET /api/orders
 // @access Private
 export const getOrders = asyncHandler(async (req, res) => {
   const { status } = req.query;
-  const filter = {};
+  const filter = { tenant: req.tenantId };
   if (status && status !== 'All') filter.status = status;
 
   const orders = await Order.find(filter).sort({ createdAt: -1 });
@@ -43,7 +22,7 @@ export const getOrders = asyncHandler(async (req, res) => {
 // @route  GET /api/orders/:id
 // @access Private
 export const getOrderById = asyncHandler(async (req, res) => {
-  const order = await Order.findById(req.params.id);
+  const order = await Order.findOne({ _id: req.params.id, tenant: req.tenantId });
   if (!order) {
     res.status(404);
     throw new Error('Order not found');
@@ -86,7 +65,7 @@ export const checkoutOrder = asyncHandler(async (req, res) => {
     );
   }
 
-  await requireTransactionSupport(res);
+  await ensureTransactionSupport();
   const session = await mongoose.startSession();
   try {
     let order;
@@ -95,7 +74,7 @@ export const checkoutOrder = asyncHandler(async (req, res) => {
       let subtotal = 0;
 
       for (const [productId, quantity] of quantitiesByProduct) {
-        const product = await Product.findById(productId).session(session);
+        const product = await Product.findOne({ _id: productId, tenant: req.tenantId }).session(session);
         if (!product) {
           res.status(404);
           throw new Error('A product in this cart no longer exists');
@@ -115,6 +94,7 @@ export const checkoutOrder = asyncHandler(async (req, res) => {
             product: product._id,
             warehouse: product.warehouse,
             store: product.store,
+            tenant: req.tenantId,
             change: -quantity,
             reason: 'POS sale',
             resultingStock: product.stock,
@@ -149,6 +129,7 @@ export const checkoutOrder = asyncHandler(async (req, res) => {
           status: 'Completed',
           createdBy: req.user._id,
           store: req.user.store,
+          tenant: req.tenantId,
         }],
         { session },
       );
@@ -172,7 +153,7 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
   }
 
   if (status !== 'Cancelled') {
-    const order = await Order.findById(req.params.id);
+    const order = await Order.findOne({ _id: req.params.id, tenant: req.tenantId });
     if (!order) {
       res.status(404);
       throw new Error('Order not found');
@@ -199,7 +180,7 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
     return;
   }
 
-  const currentOrder = await Order.findById(req.params.id);
+  const currentOrder = await Order.findOne({ _id: req.params.id, tenant: req.tenantId });
   if (!currentOrder) {
     res.status(404);
     throw new Error('Order not found');
@@ -212,13 +193,13 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
     res.status(400);
     throw new Error('Completed orders cannot be changed');
   }
-  await requireTransactionSupport(res);
+  await ensureTransactionSupport();
 
   const session = await mongoose.startSession();
   try {
     let updatedOrder;
     await session.withTransaction(async () => {
-      const order = await Order.findById(req.params.id).session(session);
+      const order = await Order.findOne({ _id: req.params.id, tenant: req.tenantId }).session(session);
       if (!order) {
         res.status(404);
         throw new Error('Order not found');
@@ -234,7 +215,7 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
 
       if (status === 'Cancelled') {
         for (const item of order.items) {
-          const product = await Product.findById(item.product).session(session);
+          const product = await Product.findOne({ _id: item.product, tenant: req.tenantId }).session(session);
           if (!product) continue;
 
           product.stock += item.quantity;
@@ -246,6 +227,7 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
               product: product._id,
               warehouse: product.warehouse,
               store: product.store,
+              tenant: req.tenantId,
               change: item.quantity,
               reason: `Order ${order.orderNumber} cancelled`,
               resultingStock: product.stock,
@@ -269,6 +251,6 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
 // @access Private
 export const getRecentTransactions = asyncHandler(async (req, res) => {
   const limit = Number(req.query.limit) || 5;
-  const orders = await Order.find().sort({ createdAt: -1 }).limit(limit);
+  const orders = await Order.find({ tenant: req.tenantId }).sort({ createdAt: -1 }).limit(limit);
   res.status(200).json({ success: true, orders });
 });

@@ -16,6 +16,7 @@ feature checklist, see [DEPLOYMENT.md](./DEPLOYMENT.md).
 - Role-Based Access Control (RBAC)
 - Admin, Manager & Cashier Roles
 - Secure Password Hashing with bcrypt
+- Independent stores with backend-enforced tenant data isolation
 
 ### 📊 Dashboard
 - Total Sales
@@ -160,16 +161,16 @@ cd backend
 
 npm install
 
-npm run create-admin
-
 npm run dev
 ```
 
-For a fresh database, the setup command asks for your first Admin name, email,
-and password and stores the password securely. If this Atlas database already
-has accounts, sign in with an existing account instead of creating another
-Admin. The database and collections are created automatically as you add data;
-there is no seed command.
+For an existing database, back it up and run `npm run migrate-tenants` from the
+`backend` folder before starting the new tenant-aware API. The migration puts
+all existing data in a shared Legacy Store tenant to preserve current access.
+On a fresh database, choose **Create New Store Account** on the login page;
+registration creates a store and its Admin account together. The optional
+`npm run create-admin` command can provision an Admin/store from the backend
+directory.
 
 The API runs at:
 

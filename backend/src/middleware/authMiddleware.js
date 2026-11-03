@@ -28,8 +28,13 @@ export const protect = asyncHandler(async (req, res, next) => {
     res.status(401);
     throw new Error('Not authorized, user not found');
   }
+  if (!user.tenant) {
+    res.status(403);
+    throw new Error('This account has not been assigned to a store. Run the tenant migration before signing in.');
+  }
 
   req.user = user;
+  req.tenantId = user.tenant;
   next();
 });
 

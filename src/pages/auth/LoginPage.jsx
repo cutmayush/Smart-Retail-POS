@@ -93,12 +93,22 @@ function LoginPage() {
           <a href="#workspace" className="transition hover:text-white">How it works</a>
         </nav>
 
-        <a
-          href="#sign-in"
-          className="inline-flex items-center gap-2 rounded-full bg-blue-500 px-4 py-2.5 text-xs font-semibold text-white shadow-lg shadow-blue-950/30 transition hover:bg-blue-400 sm:px-5"
-        >
-          Sign in <FiArrowUpRight className="h-4 w-4" />
-        </a>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Link
+            to="/register"
+            aria-label="Create New Store Account"
+            className="rounded-full border border-white/15 px-3 py-2.5 text-[10px] font-semibold text-slate-200 transition hover:border-white/30 hover:bg-white/[0.08] sm:px-4 sm:text-xs"
+          >
+            <span className="sm:hidden">Register store</span>
+            <span className="hidden sm:inline">Create New Store Account</span>
+          </Link>
+          <a
+            href="#sign-in"
+            className="inline-flex items-center gap-2 rounded-full bg-blue-500 px-3 py-2.5 text-[10px] font-semibold text-white shadow-lg shadow-blue-950/30 transition hover:bg-blue-400 sm:px-5 sm:text-xs"
+          >
+            Sign in <FiArrowUpRight className="h-4 w-4" />
+          </a>
+        </div>
       </header>
 
       <main id="home" className="relative z-10 mx-auto w-full max-w-7xl px-5 pb-16 sm:px-8 lg:px-12">
@@ -400,6 +410,12 @@ function LoginPage() {
                 </AnimatePresence>
               </Button>
             </form>
+            <p className="mt-4 text-center text-xs text-slate-500">
+              New to Smart Retail?{' '}
+              <Link to="/register" className="font-semibold text-cyan-700 transition hover:text-cyan-800">
+                Register your store
+              </Link>
+            </p>
           </div>
         </section>
 

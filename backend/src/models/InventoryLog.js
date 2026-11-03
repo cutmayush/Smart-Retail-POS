@@ -5,6 +5,7 @@ const inventoryLogSchema = new mongoose.Schema(
     product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
     warehouse: { type: String, default: 'Warehouse A' },
     store: { type: String, default: 'Central Flagship' },
+    tenant: { type: mongoose.Schema.Types.ObjectId, ref: 'Store', required: true, index: true },
     change: { type: Number, required: true }, // +ve = stock in, -ve = stock out
     reason: { type: String, default: 'Manual adjustment' },
     resultingStock: { type: Number, required: true },
@@ -15,5 +16,4 @@ const inventoryLogSchema = new mongoose.Schema(
 const InventoryLog = mongoose.model('InventoryLog', inventoryLogSchema);
 
 export default InventoryLog;
-
 

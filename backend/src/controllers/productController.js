@@ -5,7 +5,7 @@ import Product from '../models/Product.js';
 // @access Private
 export const getProducts = asyncHandler(async (req, res) => {
   const { search, category } = req.query;
-  const filter = {};
+  const filter = { tenant: req.tenantId };
 
   if (category && category !== 'All') {
     filter.category = category;
@@ -26,7 +26,7 @@ export const getProducts = asyncHandler(async (req, res) => {
 // @route  GET /api/products/:id
 // @access Private
 export const getProductById = asyncHandler(async (req, res) => {
-  const product = await Product.findById(req.params.id);
+  const product = await Product.findOne({ _id: req.params.id, tenant: req.tenantId });
   if (!product) {
     res.status(404);
     throw new Error('Product not found');
@@ -37,7 +37,7 @@ export const getProductById = asyncHandler(async (req, res) => {
 // @route  GET /api/products/barcode/:barcode
 // @access Private
 export const getProductByBarcode = asyncHandler(async (req, res) => {
-  const product = await Product.findOne({ barcode: req.params.barcode });
+  const product = await Product.findOne({ barcode: req.params.barcode, tenant: req.tenantId });
   if (!product) {
     res.status(404);
     throw new Error('No product matched the barcode input');
@@ -67,6 +67,7 @@ export const createProduct = asyncHandler(async (req, res) => {
     imageUrl,
     warehouse,
     store,
+    tenant: req.tenantId,
     revenue: 0,
     sold: 0,
   });
@@ -82,7 +83,7 @@ export const updateProduct = asyncHandler(async (req, res) => {
     throw new Error('Use the inventory stock adjustment endpoint to change stock');
   }
 
-  const product = await Product.findById(req.params.id);
+  const product = await Product.findOne({ _id: req.params.id, tenant: req.tenantId });
   if (!product) {
     res.status(404);
     throw new Error('Product not found');
@@ -102,7 +103,7 @@ export const updateProduct = asyncHandler(async (req, res) => {
 // @route  DELETE /api/products/:id
 // @access Private (Admin, Manager)
 export const deleteProduct = asyncHandler(async (req, res) => {
-  const product = await Product.findById(req.params.id);
+  const product = await Product.findOne({ _id: req.params.id, tenant: req.tenantId });
   if (!product) {
     res.status(404);
     throw new Error('Product not found');
@@ -115,6 +116,6 @@ export const deleteProduct = asyncHandler(async (req, res) => {
 // @access Private
 export const getTopProducts = asyncHandler(async (req, res) => {
   const limit = Number(req.query.limit) || 5;
-  const products = await Product.find().sort({ sold: -1 }).limit(limit);
+  const products = await Product.find({ tenant: req.tenantId }).sort({ sold: -1 }).limit(limit);
   res.status(200).json({ success: true, products });
 });

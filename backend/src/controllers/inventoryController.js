@@ -6,11 +6,11 @@ import InventoryLog from '../models/InventoryLog.js';
 // @access Private
 // Shapes products into the { id, product, warehouse, stock, threshold, movement, store } rows InventoryPage.jsx expects
 export const getInventory = asyncHandler(async (req, res) => {
-  const products = await Product.find().sort({ stock: 1 });
+  const products = await Product.find({ tenant: req.tenantId }).sort({ stock: 1 });
 
   const items = await Promise.all(
     products.map(async (product) => {
-      const lastLog = await InventoryLog.findOne({ product: product._id }).sort({ createdAt: -1 });
+      const lastLog = await InventoryLog.findOne({ product: product._id, tenant: req.tenantId }).sort({ createdAt: -1 });
       return {
         id: product._id,
         productId: product._id,
@@ -31,7 +31,7 @@ export const getInventory = asyncHandler(async (req, res) => {
 // @route  GET /api/inventory/summary
 // @access Private
 export const getInventorySummary = asyncHandler(async (req, res) => {
-  const products = await Product.find();
+  const products = await Product.find({ tenant: req.tenantId });
   const warehouses = new Set(products.map((p) => p.warehouse));
   const stores = new Set(products.map((p) => p.store));
   const lowStockCount = products.filter((p) => p.stock <= p.threshold).length;
@@ -58,7 +58,7 @@ export const adjustStock = asyncHandler(async (req, res) => {
     throw new Error('Stock adjustment must be a non-zero whole number');
   }
 
-  const product = await Product.findById(req.params.productId);
+  const product = await Product.findOne({ _id: req.params.productId, tenant: req.tenantId });
   if (!product) {
     res.status(404);
     throw new Error('Product not found');
@@ -77,6 +77,7 @@ export const adjustStock = asyncHandler(async (req, res) => {
     product: product._id,
     warehouse: product.warehouse,
     store: product.store,
+    tenant: req.tenantId,
     change: quantity,
     reason: reason || (quantity > 0 ? 'Stock in' : 'Stock out'),
     resultingStock: product.stock,
@@ -88,6 +89,11 @@ export const adjustStock = asyncHandler(async (req, res) => {
 // @route  GET /api/inventory/:productId/logs
 // @access Private
 export const getInventoryLogs = asyncHandler(async (req, res) => {
-  const logs = await InventoryLog.find({ product: req.params.productId }).sort({ createdAt: -1 });
+  const product = await Product.findOne({ _id: req.params.productId, tenant: req.tenantId });
+  if (!product) {
+    res.status(404);
+    throw new Error('Product not found');
+  }
+  const logs = await InventoryLog.find({ product: product._id, tenant: req.tenantId }).sort({ createdAt: -1 });
   res.status(200).json({ success: true, logs });
 });

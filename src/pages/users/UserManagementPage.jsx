@@ -43,7 +43,7 @@ function UserManagementPage() {
 
   const openCreate = (role) => {
     setEditing(null);
-    reset({ name: '', email: '', password: '', role, store: 'Central Flagship' });
+    reset({ name: '', email: '', password: '', role, store: currentUser?.store || '' });
     setOpen(true);
   };
 
